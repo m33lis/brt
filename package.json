@@ -1,0 +1,28 @@
+{
+  "name": "brt",
+  "version": "0.0.1",
+  "description": "Bitcoin Realtime Ticker",
+  "main": "brt.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "b:git/brt"
+  },
+  "author": "Meelis A.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "http-server": "^0.9.0",
+    "qunitjs": "^2.3.1"
+  },
+  "scripts": {
+    "update-deps": "npm update",
+
+    "prestart": "npm install",
+    "start": "http-server -a localhost -p 8005 -c-1 ./src/main/webapp/",
+
+    "pretest": "npm install",
+    "test": "node_modules/qunitjs/bin/qunit 'src/test/spec/**/*.js'"
+  }
+}
