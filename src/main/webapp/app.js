@@ -5,7 +5,9 @@
 		init: init,
 		activeSockets: [],
 		vendors: [{name: "cex", url: "wss://ws.cex.io/ws/", config: { subscribe: { e: "subscribe", rooms: [ "tickers"]}}},
-					{name: "acx", url: "wss://ws-feed.gdax.com/", config: {subscribe: { type: "subscribe", product_ids: ["BTC-USD"]}}}]
+					{name: "acx", url: "wss://ws-feed.gdax.com/", config: {subscribe: { type: "subscribe", product_ids: ["BTC-USD"]}}},
+					{name: "poloniex", url: "wss://api.poloniex.com", config: {subscribe: { type: "subscribe", product_ids: ["BTC_USD"]}}},
+					{name: "bitfinex", url: "wss://api.bitfinex.com/ws/2", config: {subscribe: { event: "subscribe", channel: "ticker", symbol: "tBTCUSD"}}}]
 	};
 
 	function init() {
@@ -15,8 +17,8 @@
 		// subscribe to feeds
 		// start writing data into applicable arrays
 		//connect(Brt.vendors[0]);
-		connect(Brt.vendors[0]);
-		connect(Brt.vendors[1]);
+		connect(Brt.vendors[3]);
+		//connect(Brt.vendors[1]);
 
 
 		console.log("DEBUG:: activeSockets: ", Brt.activeSockets);
@@ -38,12 +40,14 @@
 					subscribe(socket, vendor.config);
 
 			socket.onmessage = function (data) {
-				console.log("DEBUG:: data: ", data);
+				//console.log("DEBUG:: data: ", data);
+				var a = JSON.parse(data.data);
+				//console.log("DEBUG::a: ", a);
 				if (JSON.parse(data.data).e == "connected") {
 					// let's subscribe
 					subscribe(socket, vendor.config);
 				} else {
-					console.log("DEBUG:: data: ", JSON.parse(data.data));
+					console.log("DEBUG:: data: ", a);
 					document.getElementById("btcusd").innerHTML = JSON.parse(data.data).price;
 				}
 			}
