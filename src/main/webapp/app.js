@@ -65,7 +65,7 @@
 									if (t[1] !== "hb" && t.event !== "info" && t.event !== "subscribed") {
 										return {
 													price: t[1][6],
-													timestamp: Date.now() // fixme!, incorrect time
+													timestamp: Date.now()
 												};
 									}
 								}
@@ -83,7 +83,7 @@
 									var t = JSON.parse(data.data);
 									return {
 												price: t.tick.quote,
-												timestamp: Date.now() // fixme!, incorrect time
+												timestamp: Date.now()
 											};
 								}
 							}
@@ -128,7 +128,6 @@
 
 						if ((Date.now() - res.timestamp) < Brt.maxAge) {
 							document.getElementById(data.srcElement.type).innerHTML = res.price;
-							console.log("DEBUG:: price: "+res.price+", timestamp: "+res.timestamp+", origin: "+data.origin+", timeDiff: "+(Date.now() - res.timestamp));
 						}
 					}
 
