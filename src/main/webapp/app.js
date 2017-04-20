@@ -7,6 +7,8 @@
 		currentEurUsd: 0,
 		btcUsdActiveSockets: [],
 		eurUsdActiveSockets: [],
+		closeAll: closeAll,
+		maxAgeDiff:  1000000,
 		btcUsdSources: [{	
 							type: "btcusd",
 							name: "okcoin", 
@@ -17,7 +19,11 @@
 									channel: "ok_sub_spotusd_btc_ticker"
 								},
 								processData: function (data) {
-									return data[0].data.sell;
+									var t = JSON.parse(data.data);
+									return { 
+												price: t[0].data.sell,
+												timestamp: t[0].data.timestamp
+												 };
 								}
 							}
 						},
@@ -31,8 +37,10 @@
 									product_ids: ["BTC-USD"]
 								},
 								processData: function (data) {
-									if (data.type === "done" && data.reason !== "canceled") {
-										return data.price;
+									var t= JSON.parse(data.data);
+									if (t.type === "done" && t.reason !== "canceled") {
+										return { price: t.price, 
+													timestamp: new Date(t.time).getTime() };
 									}
 								}
 							}
@@ -48,26 +56,16 @@
 									symbol: "tBTCUSD"
 								},
 								processData: function (data) {
-									if (data[1] !== "hb") {
-										return data[1][6];
+									var t = JSON.parse(data.data);
+									if (t[1] !== "hb" && t.event !== "info" && t.event !== "subscribed") {
+										return {price: t[1][6],
+											timestamp: Date.now() // fixme!, incorrect time
+										};
 									}
 								}
 							}
 						}],
-		eurUsdSources: [{
-							type: "eurusd",
-							name: "xapi",
-							url: "wss://clientapi.tradeblock.com/fix",
-							config: {
-								subscribe: {
-									action: "subscribe",
-									channel: "orderbooks"
-								},
-								processData: function (data) {
-									return data.returnData;
-								}
-							}
-						},
+		eurUsdSources: [
 						{
 							type: "eurusd",
 							name: "binary",
@@ -77,63 +75,57 @@
 									ticks: "frxEURUSD"
 								},
 								processData: function (data) {
-									return data.tick.quote;
+									var t = JSON.parse(data.data);
+									return {price: t.tick.quote,
+											timestamp: Date.now() // fixme!, incorrect time
+										};
 								}
 							}
 						}]
 	};
 
 	function init() {
-		console.log("DEBUG:: Initiating Bitcoin Realtime Tracker");
-		// config
-		// connect sockets
-		// subscribe to feeds
-		// start writing data into applicable arrays
-		//connect(Brt.btcUsdSources[0]);
-		//connect(Brt.btcUsdSources[1]);
-		//connect(Brt.btcUsdSources[0]);
-		//connect(Brt.btcUsdSources[1]);
-		//connect(Brt.btcUsdSources[2]);
-		//connect(Brt.eurUsdSources[0]);
+		// connect btcusd sources
+		for (var i=0;i<Brt.btcUsdSources.length;i++) {
+			connect(Brt.btcUsdSources[i]);
+		}
+		// connect eurusd source
 		connect(Brt.eurUsdSources[0]);
-
-		console.log("DEBUG:: btcUsdActiveSockets: ", Brt.btcUsdActiveSockets);
-
-	}
-
-	function config() {
-		// load configuration 
 	}
 
 	function connect(vendor) {
 
 		var socket = new WebSocket(vendor.url);
-		console.log("DEBUG:: Loading socket: " + vendor.name + ", with data: ", socket);
 		socket.onopen = function (event) {
 			
 			subscribe(socket, vendor.config);
-
 			socket["type"] = vendor.type;
 
 			socket.onmessage = function (data) {
 
-				if (data.srcElement.type === "btcusd") {
-					var btcUsd = formatBtcUsdData(data);
-					if (btcUsd !== undefined) {
-						Brt.currentBtcUsd = btcUsd;
-						document.getElementById("btcusd").innerHTML = btcUsd;
-						console.log("DEBUG:: btcUsd: " + btcUsd + ", origin: " + data.origin);
+				if (data.srcElement.type === "btcusd" || data.srcElement.type === "eurusd") {
+					
+					var res = formatData(data, data.srcElement.type);
+
+					if (res !== undefined) {
+						data.srcElement.type === "btcusd"
+						? Brt.currentBtcUsd = res.price
+						: Brt.currentEurUsd = res.price;
+						
+						if ((Date.now() - res.timestamp) < Brt.maxAgeDiff) {
+							document.getElementById(data.srcElement.type).innerHTML = res.price;
+							console.log("DEBUG:: price: "+res.price+", timestamp: "+res.timestamp+", origin: "+data.origin+", timeDiff: "+(Date.now() - res.timestamp));
+						}
 					}
 
-				} else if (data.srcElement.type === "eurusd") {
-					var eurUsd = formatEurUsdData(data);
-					if (eurUsd !== undefined) {
-						Brt.currentEurUsd = eurUsd;
-						document.getElementById("eurusd").innerHTML = eurUsd;
-						console.log("DEBUG:: eurUsd: " + eurUsd + ", origin: " + data.origin);	
-					}	
 				} else {
 					console.log("ERROR: Unsupported element type!");
+				}
+
+
+				if (Brt.btcUsdActiveSockets.length > 0 && Brt.eurUsdActiveSockets.length > 0) {
+					// we have both values, let's calculate BTC/EUR
+					document.getElementById("btceur").innerHTML = (Brt.currentBtcUsd / Brt.currentEurUsd).toFixed(5);
 				}
 			}
 
@@ -145,42 +137,27 @@
 
 			updateActiveSources();
 
-			if (Brt.btcUsdActiveSockets.length > 0 && Brt.eurUsdActiveSockets.length > 0) {
-				// we have both values, let's calculate BTC/EUR
-				document.getElementById("btceur").innerHTML = Brt.currentBtcUsd / Brt.currentEurUsd;
-			}
 		}
 	}
 
 	function subscribe(socket, config) {
-		console.log("DEBUG:: config:: ", config);
-
 		socket.send(JSON.stringify(config.subscribe));
 	}
 
+	function formatData(data, sType) {
+		var sources;
 
-	function formatBtcUsdData(data) {
+		sType === "btcusd" 
+			? sources = Brt.btcUsdSources
+			: sources = Brt.eurUsdSources;
+
 		if (data.origin !== "undefined") {
-			for (var i=0; i<Brt.btcUsdSources.length; i++) {
-				if (Brt.btcUsdSources[i].url.indexOf(data.origin) == 0) {
-					return Brt.btcUsdSources[i].config.processData(JSON.parse(data.data));
+			for (var i=0; i<sources.length; i++) {
+				if (sources[i].url.indexOf(data.origin) == 0) {
+					return sources[i].config.processData(data);
 				}
 			}
-		} else {
-			console.log("ERROR: WS data origin undefined!!");
 		}
-	}
-
-	function formatEurUsdData(data) {
-			if (data.origin !== "undefined") {
-			for (var i=0; i<Brt.eurUsdSources.length; i++) {
-				if (Brt.eurUsdSources[i].url.indexOf(data.origin) == 0) {
-					return Brt.eurUsdSources[i].config.processData(JSON.parse(data.data));
-				}
-			}
-		} else {
-			console.log("ERROR: WS data origin undefined!!");
-		}	
 	}
 
 	function updateActiveSources() {
@@ -189,6 +166,18 @@
 		document.getElementById("eurusdSources").innerHTML = 
 			"(" + Brt.eurUsdActiveSockets.length + " of " + Brt.eurUsdSources.length + ")";
 	}
+
+	function closeAll(sockets) {
+		for (var i=0;i<sockets.length;i++) {
+			sockets[i].close();
+		};
+	}
+
+
+	window.addEventListener("beforeunload", function (event) {
+		closeAll(Brt.btcUsdActiveSockets);
+		closeAll(Brt.eurUsdActiveSockets);
+	})
 
 	Brt.init();
 
