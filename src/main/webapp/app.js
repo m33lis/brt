@@ -3,12 +3,16 @@
 
 	var Brt = {
 		init: init,
+		closeAll: closeAll,
+		
 		currentBtcUsd: 0,
 		currentEurUsd: 0,
+		maxAge:  3600000, // message max age
+		latest: 0,
+		timer: null,
+
 		btcUsdActiveSockets: [],
 		eurUsdActiveSockets: [],
-		closeAll: closeAll,
-		maxAgeDiff:  1000000,
 		btcUsdSources: [{	
 							type: "btcusd",
 							name: "okcoin", 
@@ -37,7 +41,7 @@
 									product_ids: ["BTC-USD"]
 								},
 								processData: function (data) {
-									var t= JSON.parse(data.data);
+									var t = JSON.parse(data.data);
 									if (t.type === "done" && t.reason !== "canceled") {
 										return { 
 													price: t.price, 
@@ -67,8 +71,7 @@
 								}
 							}
 						}],
-		eurUsdSources: [
-						{
+		eurUsdSources: [{
 							type: "eurusd",
 							name: "binary",
 							url: "wss://ws.binaryws.com/websockets/v3?app_id=1089",
@@ -88,12 +91,17 @@
 	};
 
 	function init() {
+
+		Brt.timer = timer(Brt.maxAge);
+
 		// connect btcusd sources
 		for (var i=0;i<Brt.btcUsdSources.length;i++) {
 			connect(Brt.btcUsdSources[i]);
 		}
 		// connect eurusd source
-		connect(Brt.eurUsdSources[0]);
+		for (var j=0;j<Brt.eurUsdSources.length;j++) {
+			connect(Brt.eurUsdSources[j]);
+		}
 	}
 
 	function connect(vendor) {
@@ -115,7 +123,10 @@
 						? Brt.currentBtcUsd = res.price
 						: Brt.currentEurUsd = res.price;
 						
-						if ((Date.now() - res.timestamp) < Brt.maxAgeDiff) {
+						Brt.timer = timer(Brt.maxAge);
+						Brt.latest = new Date().getTime();
+
+						if ((Date.now() - res.timestamp) < Brt.maxAge) {
 							document.getElementById(data.srcElement.type).innerHTML = res.price;
 							console.log("DEBUG:: price: "+res.price+", timestamp: "+res.timestamp+", origin: "+data.origin+", timeDiff: "+(Date.now() - res.timestamp));
 						}
@@ -176,6 +187,14 @@
 		};
 	}
 
+	function timer(time) {
+		setTimeout(function(){
+			if ((new Date().getTime() - Brt.latest) > Brt.maxAge) {
+				alert("Newest message is " + time/60000 + " minutes old, please refresh the web-page to try again!");	
+			}
+			
+		}, time);
+	}
 
 	window.addEventListener("beforeunload", function (event) {
 		closeAll(Brt.btcUsdActiveSockets);
