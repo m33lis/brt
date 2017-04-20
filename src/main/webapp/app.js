@@ -23,7 +23,7 @@
 									return { 
 												price: t[0].data.sell,
 												timestamp: t[0].data.timestamp
-												 };
+											 };
 								}
 							}
 						},
@@ -39,9 +39,10 @@
 								processData: function (data) {
 									var t= JSON.parse(data.data);
 									if (t.type === "done" && t.reason !== "canceled") {
-										return { price: t.price, 
+										return { 
+													price: t.price, 
 													timestamp: new Date(t.time).getTime() };
-									}
+												};
 								}
 							}
 						},
@@ -58,9 +59,10 @@
 								processData: function (data) {
 									var t = JSON.parse(data.data);
 									if (t[1] !== "hb" && t.event !== "info" && t.event !== "subscribed") {
-										return {price: t[1][6],
-											timestamp: Date.now() // fixme!, incorrect time
-										};
+										return {
+													price: t[1][6],
+													timestamp: Date.now() // fixme!, incorrect time
+												};
 									}
 								}
 							}
@@ -76,9 +78,10 @@
 								},
 								processData: function (data) {
 									var t = JSON.parse(data.data);
-									return {price: t.tick.quote,
-											timestamp: Date.now() // fixme!, incorrect time
-										};
+									return {
+												price: t.tick.quote,
+												timestamp: Date.now() // fixme!, incorrect time
+											};
 								}
 							}
 						}]
